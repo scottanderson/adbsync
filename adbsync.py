@@ -41,7 +41,7 @@ def touch(fname, dt=None):
   with file(fname, 'a'):
     os.utime(fname, dt)
 
-LS_LINE_REGEX = re.compile(r'(..........)\s+(\w+)\s+(\w+)\s+(\d+)\s+(\d\d\d\d-\d\d-\d\d \d\d:\d\d)\s+(.+)$')
+LS_LINE_REGEX = re.compile(r'(..........)\s+(\w+)\s+(\w+)\s+(\d*)\s+(\d\d\d\d-\d\d-\d\d \d\d:\d\d)\s+(.+)$')
 
 class FileInfo(object):
   def __init__(self, perms, user, group, size, timestamp, name):
@@ -62,10 +62,19 @@ class FileInfo(object):
                      self.name))) + ')'
 
 def ListAndroidDir(dir):
+  dirs = []
   for line in subprocess.check_output(['adb', 'shell', 'ls', '-la', dir]).split('\r\n'):
     if line:
       m = LS_LINE_REGEX.match(line)
-      yield FileInfo(*m.groups())
+      if m.group(0).startswith('d'):
+        dirs.append(m.group(6))
+      else:
+        m = LS_LINE_REGEX.match(line)
+        yield FileInfo(*m.groups())
+  for subdir in dirs:
+    for value in ListAndroidDir(dir + subdir + '/'):
+      value.name = subdir + '/' + value.name
+      yield value
 
 def main():
   parser = argparse.ArgumentParser(description='Android file sync tool.')
